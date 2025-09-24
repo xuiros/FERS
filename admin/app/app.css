@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+.sidebar {
+  width: 240px;
+  background: #1e293b; /* slate-800 */
+  color: white;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.logo-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.logo {
+  width: 120px;
+  height: auto;
+}
+
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none !important;
+}
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-sA+e2tu6p+U6Gk+g1QpF+6jQbQKjvGQ4p+Q1p5Q0p+Q="
+  crossOrigin=""
+/>

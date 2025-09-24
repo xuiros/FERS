@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "632787440723",
+    "project_id": "adminwebsitefers",
+    "storage_bucket": "adminwebsitefers.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632787440723:android:25ce2f3a2338655ba1a2a6",
+        "android_client_info": {
+          "package_name": "com.fers"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVsYwSE1RxUp2m4rOd5g7y4nH7CRvY_nE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
