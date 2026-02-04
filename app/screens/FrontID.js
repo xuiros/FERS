@@ -1,26 +1,42 @@
 import React, { useRef, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Image, Alert,StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  Modal,
+} from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useNavigation } from "@react-navigation/native";
+import { manipulateAsync } from "expo-image-manipulator";
+import * as FileSystem from "expo-file-system/legacy";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import axios from "axios";
 
 export default function FrontID() {
   const cameraRef = useRef(null);
+  const navigation = useNavigation();
+  const route = useRoute();
   const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState(null);
-  const navigation = useNavigation();
+  const [scanning, setScanning] = useState(false);
 
-  // 🔹 Replace this with your ngrok HTTPS URL
-  const NGROK_URL = "https://5da2334c9353.ngrok-free.app/vision";
+  const selectedId = route.params?.selectedId;
+  const userId = route.params?.userId;
+
+  const BACKEND_URL = "http://10.53.52.120:5000/api/vision";
 
   if (!permission) return <View />;
   if (!permission.granted) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <Text>No camera access</Text>
-        <TouchableOpacity onPress={requestPermission}>
-          <Text>Grant Permission</Text>
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>Camera access is required</Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={requestPermission}
+        >
+          <Text style={styles.permissionButtonText}>Grant Permission</Text>
         </TouchableOpacity>
       </View>
     );
@@ -29,65 +45,105 @@ export default function FrontID() {
   const takePicture = async () => {
     if (!cameraRef.current) return;
     setLoading(true);
+    setScanning(true);
 
     try {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true });
-      setPreview(photo.uri);
+      // Capture photo
+      const photo = await cameraRef.current.takePictureAsync({ quality: 1 });
+      const cropped = await cropImage(photo);
+      const base64Image = await convertToBase64(cropped.uri);
 
-      const response = await axios.post(NGROK_URL, {
-        base64Image: photo.base64,
+      // Send to backend
+      const response = await axios.post(BACKEND_URL, {
+        base64Image,
+        userId,
       });
 
-      navigation.navigate("BackID", { frontData: response.data });
+      const frontData = response.data?.data;
+      console.log("✅ Front ID processed:", frontData);
+
+      Alert.alert("Success", "Front ID scanned successfully!");
+
+      // Automatically go to BackID screen
+      navigation.replace("BackID", {
+        frontData,
+        userId,
+        selectedId,
+      });
     } catch (error) {
-      console.error("Upload error:", error.message);
-      Alert.alert("Error", error.message);
+      console.error("❌ Upload error:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to upload front ID."
+      );
     } finally {
       setLoading(false);
+      setScanning(false);
     }
   };
 
-  return (
-    <View className="flex-1 bg-black">
-      {preview ? (
-        <Image source={{ uri: preview }} style={{ flex: 1 }} />
-      ) : (
-        <CameraView style={{ flex: 1 }} ref={cameraRef} />
-      )}
+  const cropImage = async (photo) => {
+    const cropWidth = photo.width * 0.8;
+    const cropHeight = photo.height * 0.4;
+    const cropX = (photo.width - cropWidth) / 2;
+    const cropY = (photo.height - cropHeight) / 2;
 
-      <View className="absolute bottom-10 w-full flex items-center">
-        {loading ? (
-          <ActivityIndicator size="large" color="#fff" />
-        ) : (
-          <TouchableOpacity
-            onPress={takePicture}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: "white",
-            }}
-          />
-        )}
+    return await manipulateAsync(
+      photo.uri,
+      [
+        {
+          crop: {
+            originX: cropX,
+            originY: cropY,
+            width: cropWidth,
+            height: cropHeight,
+          },
+        },
+      ],
+      { compress: 1, format: "jpeg" }
+    );
+  };
+
+  const convertToBase64 = async (uri) =>
+    await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+
+  return (
+    <View style={styles.container}>
+      <CameraView style={styles.camera} ref={cameraRef} facing="back" />
+
+      <View style={styles.overlay}>
+        <Text style={styles.warning}>Align the FRONT side of your ID</Text>
+        <View style={styles.rectangle} />
       </View>
+
+      <TouchableOpacity
+        style={styles.captureBtn}
+        onPress={takePicture}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#007AFF" size="large" />
+        ) : (
+          <View style={styles.innerCircle} />
+        )}
+      </TouchableOpacity>
+
+      {/* 🔔 Scanning Modal */}
+      <Modal visible={scanning} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <ActivityIndicator size="large" color="#FFD700" />
+            <Text style={styles.modalText}>Scanning Front ID...</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  cameraWrapper: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  camera: {
-    width: "100%",
-    height: "100%",
-    position: "absolute",
-  },
+  camera: { flex: 1 },
   overlay: {
     position: "absolute",
     top: 0,
@@ -99,22 +155,22 @@ const styles = StyleSheet.create({
   },
   warning: {
     position: "absolute",
-    top: 20,
+    top: 40,
     backgroundColor: "rgba(0,0,0,0.5)",
     color: "#fff",
-    padding: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
     fontSize: 14,
   },
   rectangle: {
     width: "80%",
     height: "40%",
-    borderWidth: 3,
-    borderColor: "green",
+    borderWidth: 0,
+    borderColor: "transparent",
     borderRadius: 10,
-    backgroundColor: "transparent",
   },
-  captureButton: {
+  captureBtn: {
     position: "absolute",
     bottom: 40,
     alignSelf: "center",
@@ -133,43 +189,35 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     borderRadius: 30,
   },
-  previewWrapper: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    backgroundColor: "#111",
+    padding: 30,
+    borderRadius: 15,
+    alignItems: "center",
+  },
+  modalText: {
+    color: "#FFD700",
+    marginTop: 15,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  permissionContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
   },
-  preview: {
-    width: "90%",
-    height: "70%",
-    resizeMode: "contain",
-    borderRadius: 10,
-  },
-  confirmButton: {
-    marginTop: 20,
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 10,
-  },
-  confirmButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  permissionText: {
-    color: "#fff",
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 20,
-  },
+  permissionText: { color: "#fff", fontSize: 16, marginBottom: 20 },
   permissionButton: {
     backgroundColor: "#007AFF",
-    padding: 15,
+    padding: 12,
     borderRadius: 10,
   },
-  permissionButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
+  permissionButtonText: { color: "#fff", fontWeight: "bold" },
 });

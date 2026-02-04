@@ -1,25 +1,29 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/alerts"; // temporary
+const API_URL = "http://10.0.2.2:5000/api/reports";
 
-// Create an alert
-export const createAlert = async (message) => {
+export const createAlert = async ({ type, level, description, location }) => {
   try {
-    const res = await axios.post(API_URL, { message });
-    console.log("✅ Alert created:", res.data);
+    const res = await axios.post(API_URL, {
+      type,
+      level,
+      description,
+      location,
+    });
+    console.log("✅ Report created:", res.data);
     return res.data;
   } catch (err) {
-    console.error("❌ Error creating alert:", err);
+    console.error("❌ Error creating report:", err.response?.data || err.message);
   }
 };
 
-// Get all alerts
+// Get all reports
 export const getAlerts = async () => {
   try {
     const res = await axios.get(API_URL);
-    console.log("📩 Alerts:", res.data);
+    console.log("📩 Reports:", res.data);
     return res.data;
   } catch (err) {
-    console.error("❌ Error fetching alerts:", err);
+    console.error("❌ Error fetching reports:", err);
   }
 };

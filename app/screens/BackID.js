@@ -6,48 +6,68 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Modal,
 } from "react-native";
-import { CameraView } from "expo-camera";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { manipulateAsync } from "expo-image-manipulator";
+import * as FileSystem from "expo-file-system/legacy";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import * as FileSystem from "expo-file-system";
+import axios from "axios";
 
 export default function BackID() {
   const cameraRef = useRef(null);
   const navigation = useNavigation();
   const route = useRoute();
-  const { frontData } = route.params || {};
+  const { frontData, userId } = route.params || {};
+  const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
-  // 🔹 Replace this with your ngrok URL
-  const NGROK_URL = "https://abcd1234.ngrok.io"; // <-- PUT YOUR ACTUAL NGROK URL HERE
+  const BACKEND_URL = "http://10.53.52.120:5000/api/vision/back";
+
+  if (!permission) return <View />;
+  if (!permission.granted) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>Camera access is required</Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={requestPermission}
+        >
+          <Text style={styles.permissionButtonText}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const takePicture = async () => {
-    if (cameraRef.current) {
-      setLoading(true);
-      const photo = await cameraRef.current.takePictureAsync();
-      const croppedPhoto = await cropImage(photo);
+    if (!cameraRef.current) return;
+    setLoading(true);
+    setScanning(true);
 
-      try {
-        const base64Image = await convertToBase64(croppedPhoto.uri);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 1 });
+      const cropped = await cropImage(photo);
+      const base64Image = await convertToBase64(cropped.uri);
 
-        // 🔹 Send to your backend via ngrok
-        const response = await fetch(`${NGROK_URL}/vision`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64Image }),
-        });
+      const response = await axios.post(BACKEND_URL, {
+        base64Image,
+        userId,
+      });
 
-        if (!response.ok) throw new Error("Failed to connect to backend");
+      const backData = response.data?.data;
+      console.log("✅ Back ID processed:", backData);
 
-        const visionResponse = await response.json();
+      const combined = { ...frontData, ...backData };
 
-        navigation.navigate("UserInformation", { frontData, backData: visionResponse });
-      } catch (err) {
-        Alert.alert("Error", err.message);
-      } finally {
-        setLoading(false);
-      }
+      Alert.alert("Success", "Back ID scanned successfully!");
+      navigation.replace("UserInformation", { userData: combined });
+    } catch (err) {
+      console.error("❌ Error capturing back ID:", err);
+      Alert.alert("Upload Error", err.message);
+    } finally {
+      setLoading(false);
+      setScanning(false);
     }
   };
 
@@ -73,50 +93,49 @@ export default function BackID() {
     );
   };
 
-  const convertToBase64 = async (uri) => {
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    return base64;
-  };
+  const convertToBase64 = async (uri) =>
+    await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
 
   return (
     <View style={styles.container}>
       <View style={styles.cameraWrapper}>
+        {/* ✅ CAMERA FIXED: This will now appear */}
         <CameraView style={styles.camera} ref={cameraRef} facing="back" />
         <View style={styles.overlay}>
-          <Text style={styles.warning}>Align your ID inside the rectangle</Text>
+          <Text style={styles.warning}>Align the BACK side of your ID</Text>
           <View style={styles.rectangle} />
         </View>
       </View>
+
       <TouchableOpacity
         style={styles.captureBtn}
         onPress={takePicture}
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color="#007AFF" size="large" />
         ) : (
           <View style={styles.innerCircle} />
         )}
       </TouchableOpacity>
+
+      {/* 🔔 Scanning Modal */}
+      <Modal visible={scanning} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <ActivityIndicator size="large" color="#FFD700" />
+            <Text style={styles.modalText}>Scanning Back ID...</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  cameraWrapper: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  camera: {
-    width: "100%",
-    height: "100%",
-    position: "absolute",
-  },
+  cameraWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
+  camera: { width: "100%", height: "100%", position: "absolute" },
   overlay: {
     position: "absolute",
     top: 0,
@@ -128,20 +147,20 @@ const styles = StyleSheet.create({
   },
   warning: {
     position: "absolute",
-    top: 20,
+    top: 40,
     backgroundColor: "rgba(0,0,0,0.5)",
     color: "#fff",
-    padding: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
     fontSize: 14,
   },
   rectangle: {
     width: "80%",
     height: "40%",
-    borderWidth: 3,
-    borderColor: "green",
+    borderWidth: 0,
+    borderColor: "transparent",
     borderRadius: 10,
-    backgroundColor: "transparent",
   },
   captureBtn: {
     position: "absolute",
@@ -162,4 +181,35 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     borderRadius: 30,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    backgroundColor: "#111",
+    padding: 30,
+    borderRadius: 15,
+    alignItems: "center",
+  },
+  modalText: {
+    color: "#FFD700",
+    marginTop: 15,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  permissionText: { color: "#fff", fontSize: 16, marginBottom: 20 },
+  permissionButton: {
+    backgroundColor: "#007AFF",
+    padding: 12,
+    borderRadius: 10,
+  },
+  permissionButtonText: { color: "#fff", fontWeight: "bold" },
 });

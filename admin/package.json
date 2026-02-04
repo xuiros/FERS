@@ -19,6 +19,7 @@
     "@reduxjs/toolkit": "^2.9.0",
     "axios": "^1.12.2",
     "isbot": "^5.1.27",
+    "jspdf": "^3.0.3",
     "leaflet": "^1.9.4",
     "notistack": "^3.0.2",
     "react": "^19.1.0",
@@ -27,7 +28,8 @@
     "react-redux": "^9.2.0",
     "react-router": "^7.7.1",
     "react-router-dom": "^7.9.1",
-    "recharts": "^3.2.1"
+    "recharts": "^3.2.1",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@react-router/dev": "^7.7.1",

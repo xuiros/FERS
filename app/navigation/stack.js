@@ -7,6 +7,7 @@ import SignUpScreen from '../screens/SignUpScreen';
 import FrontID from '../screens/FrontID';
 import BackID from '../screens/BackID';
 import UserInformation from '../screens/UserInformation';
+import ResponderDashboard from '../screens/ResponderDashboard';
 
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +21,8 @@ const MainStack = () => {
       <Stack.Screen name="FrontID" component={FrontID} />
       <Stack.Screen name="BackID" component={BackID} />
       <Stack.Screen name="UserInformation" component={UserInformation} />
+      
+      <Stack.Screen name="ResponderDashboard" component={ResponderDashboard}/>
     </Stack.Navigator>
   );
 };
